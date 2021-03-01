@@ -44,6 +44,7 @@ func TestGetHeaders(t *testing.T) {
 
 		tmpFile := createTempCSVFile(t, records)
 		defer tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
 
 		csvParser := parser.NewCSVParser(tmpFile)
 
