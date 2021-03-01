@@ -76,6 +76,8 @@ func createTempCSVFile(t testing.TB, records [][]string) *os.File {
 
 	csv.NewWriter(tmpCSVFile).WriteAll(records)
 
+	tmpCSVFile.Seek(0, 0)
+
 	return tmpCSVFile
 
 }
