@@ -18,17 +18,14 @@ func TestGetHeaders(t *testing.T) {
 			{"1", "James", "Bond"},
 		}
 
-		tmpFile := createTempCSVFile(t, records, ',')
-		defer tmpFile.Close()
-		defer os.Remove(tmpFile.Name())
-
-		csvParser := parser.NewCSVParser(tmpFile)
+		csvParser, clean := createCSVParserFromFile(t, records, ',')
+		defer clean()
 
 		got, err := csvParser.GetHeaders()
 		want := []string{"ID", "First Name", "Last Name"}
 
 		if err != nil {
-			t.Errorf("could not read headers from CSV file %v, %v", tmpFile.Name(), err)
+			t.Errorf("could not read headers from CSV file, %v", err)
 		}
 
 		assertCorrectHeaders(t, got, want)
@@ -60,16 +57,13 @@ func TestGetHeaders(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 
-				tmpFile := createTempCSVFile(t, records, '\t')
-				defer tmpFile.Close()
-				defer os.Remove(tmpFile.Name())
-
-				csvParser := parser.NewCSVParser(tmpFile)
+				csvParser, clean := createCSVParserFromFile(t, records, ',')
+				defer clean()
 
 				got, err := csvParser.GetHeaders()
 
 				if err != nil {
-					t.Errorf("could not read headers from CSV file %v, %v", tmpFile.Name(), err)
+					t.Errorf("could not read headers from CSV file %v", err)
 				}
 
 				assertCorrectHeaders(t, got, want)
@@ -79,24 +73,21 @@ func TestGetHeaders(t *testing.T) {
 
 	t.Run("empty CSV file returns no header", func(t *testing.T) {
 
-		tmpFile := createTempCSVFile(t, nil, ',')
-		defer tmpFile.Close()
-		defer os.Remove(tmpFile.Name())
-
-		csvParser := parser.NewCSVParser(tmpFile)
+		csvParser, clean := createCSVParserFromFile(t, nil, ',')
+		defer clean()
 
 		_, err := csvParser.GetHeaders()
 
 		if err == nil {
 			t.Errorf("expected an error, but did not get one, %v", err)
 		}
-
 	})
-
 }
 
 func assertCorrectHeaders(t testing.TB, got, want []string) {
+
 	t.Helper()
+
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("incorrect headers, got %v but want %v", got, want)
 	}
@@ -119,5 +110,20 @@ func createTempCSVFile(t testing.TB, records [][]string, delimiter rune) *os.Fil
 	tmpCSVFile.Seek(0, 0)
 
 	return tmpCSVFile
+}
 
+func createCSVParserFromFile(t testing.TB, records [][]string, delimiter rune) (*parser.CSVParser, func()) {
+
+	t.Helper()
+
+	tmpFile := createTempCSVFile(t, records, delimiter)
+
+	cleanUp := func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}
+
+	csvParser := parser.NewCSVParser(tmpFile)
+
+	return csvParser, cleanUp
 }
