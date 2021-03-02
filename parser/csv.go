@@ -12,20 +12,24 @@ import (
 type CSVParser struct {
 	delimiter   rune
 	headers     []string    // CSV file headers
+	numRecords  int         // Number of records in CSV file
 	headersRead bool        // Flag if header has been read
 	reader      *csv.Reader // CSV Reader
 }
 
 // NewCSVParser constructs a new instance of CSVParser and returns a pointer to it
 func NewCSVParser(file io.Reader) *CSVParser {
+
+	reader := csv.NewReader(file)
+	reader.Comment = '#'
+
 	return &CSVParser{
 		delimiter: ',',
-		reader:    csv.NewReader(file),
+		reader:    reader,
 	}
 }
 
 // GetHeaders returns a slice of strings containing the file headers
-// It returns an error if an error occurs while parsing file
 func (c *CSVParser) GetHeaders() ([]string, error) {
 
 	if c.headersRead {
@@ -38,9 +42,7 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 	if len(headers) == 1 {
 		delimiter := getDelimiter(headers[0])
 		c.delimiter = delimiter
-
 		c.reader.Comma = delimiter
-		c.reader.Comment = '#'
 
 		headers = strings.Split(headers[0], string(delimiter))
 	}
@@ -55,6 +57,26 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 	return headers, nil
 }
 
+// GetNumRecords returns the number of records in the CSV file
+func (c *CSVParser) GetNumRecords() (int, error) {
+
+	c.GetHeaders()
+
+	numRecords := 0
+
+	for {
+		_, err := c.reader.Read()
+
+		switch err {
+		case nil:
+			numRecords++
+		default:
+			return numRecords, err
+		}
+	}
+}
+
+// getDelimiter tries to detect the delimiter of the file (rather crudely)
 func getDelimiter(row string) rune {
 
 	delimiters := []rune{'\t', ':', ';', '|'}

@@ -84,6 +84,26 @@ func TestGetHeaders(t *testing.T) {
 	})
 }
 
+func TestNumRecords(t *testing.T) {
+
+	records := [][]string{
+		{"ID", "First Name", "Last Name"},
+		{"1", "James", "Bond"},
+		{"2", "Akinkunle", "Allen"},
+		{"# This is a comment", "James", "Bond"},
+	}
+
+	csvParser, clean := createCSVParserFromFile(t, records, ',')
+	defer clean()
+
+	got, _ := csvParser.GetNumRecords()
+	want := 2
+
+	if got != want {
+		t.Errorf("incorrect number of records, got %d but want %d", got, want)
+	}
+}
+
 func assertCorrectHeaders(t testing.TB, got, want []string) {
 
 	t.Helper()

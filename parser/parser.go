@@ -4,4 +4,5 @@ package parser
 // in the 'parser' package
 type Parser interface {
 	GetHeaders() ([]string, error)
+	GetNumRecords() (int, error)
 }
