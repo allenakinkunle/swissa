@@ -27,6 +27,7 @@ func NewCSVParser(file io.Reader) *CSVParser {
 // GetHeaders returns a slice of strings containing the file headers
 // It returns an error if an error occurs while parsing file
 func (c *CSVParser) GetHeaders() ([]string, error) {
+
 	if c.headersRead {
 		return c.headers, nil
 	}
@@ -36,8 +37,11 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 	// Infer the file delimiter, since it is not comma
 	if len(headers) == 1 {
 		delimiter := getDelimiter(headers[0])
-		c.reader.Comma = delimiter
 		c.delimiter = delimiter
+
+		c.reader.Comma = delimiter
+		c.reader.Comment = '#'
+
 		headers = strings.Split(headers[0], string(delimiter))
 	}
 
