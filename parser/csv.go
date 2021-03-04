@@ -159,7 +159,7 @@ func (c *CSVParser) buildJSON(headers, record []string, numRecordsConverted int,
 
 	if err == nil {
 		writer.Write([]byte{',', '\n'})
-		numRecordsConverted, _ = c.buildJSON(headers, record, numRecordsConverted, writer)
+		numRecordsConverted, err = c.buildJSON(headers, record, numRecordsConverted, writer)
 	}
 	if err == io.EOF {
 		return numRecordsConverted, nil
