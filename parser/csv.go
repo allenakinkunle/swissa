@@ -2,6 +2,7 @@ package parser
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"strings"
@@ -24,8 +25,9 @@ func NewCSVParser(file io.Reader) *CSVParser {
 	reader.Comment = '#'
 
 	return &CSVParser{
-		delimiter: ',',
-		reader:    reader,
+		delimiter:  ',',
+		reader:     reader,
+		numRecords: -1,
 	}
 }
 
@@ -38,6 +40,10 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 
 	headers, err := c.reader.Read()
 
+	if err != io.EOF && err != nil {
+		return nil, fmt.Errorf("error getting headers, %w", err)
+	}
+
 	// Infer the file delimiter, since it is not comma
 	if len(headers) == 1 {
 		delimiter := getDelimiter(headers[0])
@@ -45,10 +51,6 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 		c.reader.Comma = delimiter
 
 		headers = strings.Split(headers[0], string(delimiter))
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("could not read from file, %w", err)
 	}
 
 	c.headersRead = true
@@ -60,7 +62,15 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 // GetNumRecords returns the number of records in the CSV file
 func (c *CSVParser) GetNumRecords() (int, error) {
 
-	c.GetHeaders()
+	if c.numRecords != -1 {
+		return c.numRecords, nil
+	}
+
+	// Skip header
+	_, err := c.GetHeaders()
+	if err != nil {
+		return 0, fmt.Errorf("could not get number of records in CSV file, %w", err)
+	}
 
 	numRecords := 0
 
@@ -70,10 +80,92 @@ func (c *CSVParser) GetNumRecords() (int, error) {
 		switch err {
 		case nil:
 			numRecords++
+		case io.EOF:
+			c.numRecords = numRecords
+			return c.numRecords, nil
 		default:
-			return numRecords, err
+			return 0, fmt.Errorf("could not get number of records in CSV file, %w", err)
 		}
 	}
+}
+
+// Convert converts the CSV file into the specified formats and
+// writes it to the provided io.Writer
+func (c *CSVParser) Convert(toFormat string, writer io.Writer) (int, error) {
+
+	switch toFormat {
+	case FormatJSON:
+		return c.convertToJSON(writer)
+	default:
+		return 0, nil
+	}
+}
+
+func (c *CSVParser) convertToJSON(writer io.Writer) (int, error) {
+
+	headers, err := c.GetHeaders()
+
+	if err != nil {
+		return 0, fmt.Errorf("could not convert CSV to JSON %w", err)
+	}
+
+	writer.Write([]byte{'['})
+
+	numRecordsConverted, err := c.buildJSON(headers, nil, 0, writer)
+
+	if err != nil {
+		return 0, err
+	}
+
+	writer.Write([]byte{']'})
+
+	return numRecordsConverted, err
+
+}
+
+// buildJSON recursively builds the JSON array from CSV records and write them to provided writer
+func (c *CSVParser) buildJSON(headers, record []string, numRecordsConverted int, writer io.Writer) (int, error) {
+
+	var err error
+
+	if numRecordsConverted == 0 {
+		record, err = c.reader.Read()
+		if err != io.EOF && err != nil {
+			return 0, err
+		}
+	}
+
+	dictRecord := map[string]string{}
+
+	for i, header := range headers {
+		dictRecord[header] = record[i]
+	}
+
+	jsonRecord, err := json.MarshalIndent(&dictRecord, "", "  ")
+
+	if err != nil {
+		return 0, err
+	}
+
+	numRecordsConverted++
+
+	_, err = writer.Write(jsonRecord)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert records to JSON if there are more to process
+	record, err = c.reader.Read()
+
+	if err == nil {
+		writer.Write([]byte{',', '\n'})
+		numRecordsConverted, _ = c.buildJSON(headers, record, numRecordsConverted, writer)
+	}
+	if err == io.EOF {
+		return numRecordsConverted, nil
+	}
+
+	return numRecordsConverted, err
 }
 
 // getDelimiter tries to detect the delimiter of the file (rather crudely)

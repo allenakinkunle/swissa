@@ -2,6 +2,7 @@ package parser_test
 
 import (
 	"encoding/csv"
+	"io"
 	"os"
 	"reflect"
 	"testing"
@@ -24,10 +25,7 @@ func TestGetHeaders(t *testing.T) {
 		got, err := csvParser.GetHeaders()
 		want := []string{"ID", "First Name", "Last Name"}
 
-		if err != nil {
-			t.Errorf("could not read headers from CSV file, %v", err)
-		}
-
+		assertNoError(t, err, "could not read headers from CSV file")
 		assertCorrectHeaders(t, got, want)
 
 		// Get header again to make sure it returns headers are consistent
@@ -62,10 +60,7 @@ func TestGetHeaders(t *testing.T) {
 
 				got, err := csvParser.GetHeaders()
 
-				if err != nil {
-					t.Errorf("could not read headers from CSV file %v", err)
-				}
-
+				assertNoError(t, err, "could not read headers from CSV file")
 				assertCorrectHeaders(t, got, want)
 			})
 		}
@@ -76,11 +71,10 @@ func TestGetHeaders(t *testing.T) {
 		csvParser, clean := createCSVParserFromFile(t, nil, ',')
 		defer clean()
 
-		_, err := csvParser.GetHeaders()
+		got, err := csvParser.GetHeaders()
 
-		if err == nil {
-			t.Errorf("expected an error, but did not get one, %v", err)
-		}
+		assertCorrectHeaders(t, got, nil)
+		assertNoError(t, err, "")
 	})
 }
 
@@ -96,11 +90,54 @@ func TestNumRecords(t *testing.T) {
 	csvParser, clean := createCSVParserFromFile(t, records, ',')
 	defer clean()
 
-	got, _ := csvParser.GetNumRecords()
+	got, err := csvParser.GetNumRecords()
 	want := 2
 
+	if err != io.EOF && err != nil {
+		assertNoError(t, err, "could not read CSV file")
+	}
+
 	if got != want {
-		t.Errorf("incorrect number of records, got %d but want %d", got, want)
+		t.Errorf("incorrect number of records, got %v but want %v", got, want)
+	}
+}
+
+func TestConvert(t *testing.T) {
+
+	t.Run("convert to JSON", func(t *testing.T) {
+
+		records := [][]string{
+			{"ID", "First Name", "Last Name"},
+			{"1", "James", "Bond"},
+			{"2", "Akinkunle", "Allen"},
+		}
+
+		csvParser, clean := createCSVParserFromFile(t, records, ',')
+		defer clean()
+
+		// Create a temporary JSON file
+		tmpJSONFile, err := os.CreateTemp("", "test-*.json")
+		defer tmpJSONFile.Close()
+		defer os.Remove(tmpJSONFile.Name())
+
+		assertNoError(t, err, "could not create temp JSON file")
+
+		got, err := csvParser.Convert(parser.FormatJSON, tmpJSONFile)
+
+		assertNoError(t, err, "could not write to file")
+
+		if got != 2 {
+			t.Errorf("incorrect number of records converted, got %d but want %d", got, 2)
+		}
+	})
+}
+
+func assertNoError(t testing.TB, err error, message string) {
+
+	t.Helper()
+
+	if err != nil {
+		t.Errorf("%s, %v", message, err)
 	}
 }
 
