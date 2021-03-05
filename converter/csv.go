@@ -1,4 +1,4 @@
-package parser
+package converter
 
 import (
 	"encoding/csv"
@@ -8,9 +8,9 @@ import (
 	"strings"
 )
 
-// CSVParser parses a CSV-parsable io.Reader
+// CSVConverter parses a CSV-parsable io.Reader
 // It only parses files that adheres to the RFC 4180
-type CSVParser struct {
+type CSVConverter struct {
 	delimiter   rune
 	headers     []string    // CSV file headers
 	numRecords  int         // Number of records in CSV file
@@ -18,13 +18,13 @@ type CSVParser struct {
 	reader      *csv.Reader // CSV Reader
 }
 
-// NewCSVParser constructs a new instance of CSVParser and returns a pointer to it
-func NewCSVParser(file io.Reader) *CSVParser {
+// NewCSVConverter constructs a new instance of CSVConverter and returns a pointer to it
+func NewCSVConverter(file io.Reader) *CSVConverter {
 
 	reader := csv.NewReader(file)
 	reader.Comment = '#'
 
-	return &CSVParser{
+	return &CSVConverter{
 		delimiter:  ',',
 		reader:     reader,
 		numRecords: -1,
@@ -32,7 +32,7 @@ func NewCSVParser(file io.Reader) *CSVParser {
 }
 
 // GetHeaders returns a slice of strings containing the file headers
-func (c *CSVParser) GetHeaders() ([]string, error) {
+func (c *CSVConverter) GetHeaders() ([]string, error) {
 
 	if c.headersRead {
 		return c.headers, nil
@@ -60,7 +60,7 @@ func (c *CSVParser) GetHeaders() ([]string, error) {
 }
 
 // GetNumRecords returns the number of records in the CSV file
-func (c *CSVParser) GetNumRecords() (int, error) {
+func (c *CSVConverter) GetNumRecords() (int, error) {
 
 	if c.numRecords != -1 {
 		return c.numRecords, nil
@@ -91,7 +91,7 @@ func (c *CSVParser) GetNumRecords() (int, error) {
 
 // Convert converts the CSV file into the specified formats and
 // writes it to the provided io.Writer
-func (c *CSVParser) Convert(toFormat string, writer io.Writer) (int, error) {
+func (c *CSVConverter) Convert(toFormat string, writer io.Writer) (int, error) {
 
 	switch toFormat {
 	case FormatJSON:
@@ -101,7 +101,7 @@ func (c *CSVParser) Convert(toFormat string, writer io.Writer) (int, error) {
 	}
 }
 
-func (c *CSVParser) convertToJSON(writer io.Writer) (int, error) {
+func (c *CSVConverter) convertToJSON(writer io.Writer) (int, error) {
 
 	headers, err := c.GetHeaders()
 
@@ -124,7 +124,7 @@ func (c *CSVParser) convertToJSON(writer io.Writer) (int, error) {
 }
 
 // buildJSON recursively builds the JSON array from CSV records and write them to provided writer
-func (c *CSVParser) buildJSON(headers, record []string, numRecordsConverted int, writer io.Writer) (int, error) {
+func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted int, writer io.Writer) (int, error) {
 
 	var err error
 
@@ -147,12 +147,12 @@ func (c *CSVParser) buildJSON(headers, record []string, numRecordsConverted int,
 		return 0, err
 	}
 
-	numRecordsConverted++
-
 	_, err = writer.Write(jsonRecord)
 	if err != nil {
 		return 0, err
 	}
+
+	numRecordsConverted++
 
 	// Convert records to JSON if there are more to process
 	record, err = c.reader.Read()

@@ -1,4 +1,4 @@
-package parser_test
+package converter_test
 
 import (
 	"encoding/csv"
@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/allenakinkunle/swissa/parser"
+	"github.com/allenakinkunle/swissa/converter"
 )
 
 func TestGetHeaders(t *testing.T) {
@@ -19,17 +19,17 @@ func TestGetHeaders(t *testing.T) {
 			{"1", "James", "Bond"},
 		}
 
-		csvParser, clean := createCSVParserFromFile(t, records, ',')
+		csvConverter, clean := createCSVConverterFromFile(t, records, ',')
 		defer clean()
 
-		got, err := csvParser.GetHeaders()
+		got, err := csvConverter.GetHeaders()
 		want := []string{"ID", "First Name", "Last Name"}
 
 		assertNoError(t, err, "could not read headers from CSV file")
 		assertCorrectHeaders(t, got, want)
 
 		// Get header again to make sure it returns headers are consistent
-		got, _ = csvParser.GetHeaders()
+		got, _ = csvConverter.GetHeaders()
 		assertCorrectHeaders(t, got, want)
 	})
 
@@ -55,10 +55,10 @@ func TestGetHeaders(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 
-				csvParser, clean := createCSVParserFromFile(t, records, ',')
+				csvConverter, clean := createCSVConverterFromFile(t, records, ',')
 				defer clean()
 
-				got, err := csvParser.GetHeaders()
+				got, err := csvConverter.GetHeaders()
 
 				assertNoError(t, err, "could not read headers from CSV file")
 				assertCorrectHeaders(t, got, want)
@@ -68,10 +68,10 @@ func TestGetHeaders(t *testing.T) {
 
 	t.Run("empty CSV file returns no header", func(t *testing.T) {
 
-		csvParser, clean := createCSVParserFromFile(t, nil, ',')
+		csvConverter, clean := createCSVConverterFromFile(t, nil, ',')
 		defer clean()
 
-		got, err := csvParser.GetHeaders()
+		got, err := csvConverter.GetHeaders()
 
 		assertCorrectHeaders(t, got, nil)
 		assertNoError(t, err, "")
@@ -87,10 +87,10 @@ func TestNumRecords(t *testing.T) {
 		{"# This is a comment", "James", "Bond"},
 	}
 
-	csvParser, clean := createCSVParserFromFile(t, records, ',')
+	csvConverter, clean := createCSVConverterFromFile(t, records, ',')
 	defer clean()
 
-	got, err := csvParser.GetNumRecords()
+	got, err := csvConverter.GetNumRecords()
 	want := 2
 
 	if err != io.EOF && err != nil {
@@ -112,7 +112,7 @@ func TestConvert(t *testing.T) {
 			{"2", "Akinkunle", "Allen"},
 		}
 
-		csvParser, clean := createCSVParserFromFile(t, records, ',')
+		csvConverter, clean := createCSVConverterFromFile(t, records, ',')
 		defer clean()
 
 		// Create a temporary JSON file
@@ -122,7 +122,7 @@ func TestConvert(t *testing.T) {
 
 		assertNoError(t, err, "could not create temp JSON file")
 
-		got, err := csvParser.Convert(parser.FormatJSON, tmpJSONFile)
+		got, err := csvConverter.Convert(converter.FormatJSON, tmpJSONFile)
 
 		assertNoError(t, err, "could not write to file")
 
@@ -169,7 +169,7 @@ func createTempCSVFile(t testing.TB, records [][]string, delimiter rune) *os.Fil
 	return tmpCSVFile
 }
 
-func createCSVParserFromFile(t testing.TB, records [][]string, delimiter rune) (*parser.CSVParser, func()) {
+func createCSVConverterFromFile(t testing.TB, records [][]string, delimiter rune) (*converter.CSVConverter, func()) {
 
 	t.Helper()
 
@@ -180,7 +180,7 @@ func createCSVParserFromFile(t testing.TB, records [][]string, delimiter rune) (
 		os.Remove(tmpFile.Name())
 	}
 
-	csvParser := parser.NewCSVParser(tmpFile)
+	csvConverter := converter.NewCSVConverter(tmpFile)
 
-	return csvParser, cleanUp
+	return csvConverter, cleanUp
 }

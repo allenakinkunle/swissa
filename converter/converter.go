@@ -1,4 +1,4 @@
-package parser
+package converter
 
 import "io"
 
@@ -7,9 +7,9 @@ const (
 	FormatJSON = "json"
 )
 
-// Parser interface is implemented by all supported file parsers
-// in the 'parser' package
-type Parser interface {
+// Converter interface is implemented by all supported file converters
+// in the 'converter' package
+type Converter interface {
 	GetHeaders() ([]string, error)
 	GetNumRecords() (int, error)
 	Convert(toFormat string, writer io.Writer) (int, error)
