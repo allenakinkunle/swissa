@@ -55,7 +55,7 @@ func TestGetHeaders(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 
-				csvConverter, clean := createCSVConverterFromFile(t, records, ',')
+				csvConverter, clean := createCSVConverterFromFile(t, records, test.delimiter)
 				defer clean()
 
 				got, err := csvConverter.GetHeaders()
