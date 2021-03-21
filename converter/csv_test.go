@@ -1,10 +1,10 @@
 package converter_test
 
 import (
-	"encoding/csv"
 	"io"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/allenakinkunle/swissa/converter"
@@ -14,13 +14,10 @@ func TestGetHeaders(t *testing.T) {
 
 	t.Run("headers from a CSV file", func(t *testing.T) {
 
-		records := [][]string{
-			{"ID", "First Name", "Last Name"},
-			{"1", "James", "Bond"},
-		}
+		const csvString = `ID,First Name,Last Name
+		1,James,Bond`
 
-		csvConverter, clean := createCSVConverterFromFile(t, records, ',')
-		defer clean()
+		csvConverter := converter.NewCSVConverter(strings.NewReader(csvString))
 
 		got, err := csvConverter.GetHeaders()
 		want := []string{"ID", "First Name", "Last Name"}
@@ -35,28 +32,29 @@ func TestGetHeaders(t *testing.T) {
 
 	t.Run("headers from file with a different delimiters other than comma", func(t *testing.T) {
 
-		records := [][]string{
-			{"ID", "First Name", "Last Name"},
-			{"1", "James", "Bond"},
-		}
-
 		tests := []struct {
-			name      string
-			delimiter rune
+			csvString string
+			delimiter string
 		}{
-			{"tab", '\t'},
-			{"colon", ':'},
-			{"semicolon", ';'},
-			{"pipe", '|'},
+			{`ID	First Name	Last Name
+			1	James	Bond`, "tab"},
+
+			{`ID:First Name:Last Name
+			1:James:Bond`, "colon"},
+
+			{`ID;First Name;Last Name
+			1;James;Bond`, "semicolon"},
+
+			{`ID|First Name|Last Name
+			1|James|Bond`, "pipe"},
 		}
 
 		want := []string{"ID", "First Name", "Last Name"}
 
 		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
+			t.Run(test.csvString, func(t *testing.T) {
 
-				csvConverter, clean := createCSVConverterFromFile(t, records, test.delimiter)
-				defer clean()
+				csvConverter := converter.NewCSVConverter(strings.NewReader(test.csvString))
 
 				got, err := csvConverter.GetHeaders()
 
@@ -68,8 +66,8 @@ func TestGetHeaders(t *testing.T) {
 
 	t.Run("empty CSV file returns no header", func(t *testing.T) {
 
-		csvConverter, clean := createCSVConverterFromFile(t, nil, ',')
-		defer clean()
+		const csvString = ``
+		csvConverter := converter.NewCSVConverter(strings.NewReader(csvString))
 
 		got, err := csvConverter.GetHeaders()
 
@@ -80,15 +78,11 @@ func TestGetHeaders(t *testing.T) {
 
 func TestNumRecords(t *testing.T) {
 
-	records := [][]string{
-		{"ID", "First Name", "Last Name"},
-		{"1", "James", "Bond"},
-		{"2", "Akinkunle", "Allen"},
-		{"# This is a comment", "James", "Bond"},
-	}
+	const csvString = `ID,First Name,Last Name
+		1,James,Bond
+		2,Akinkunle,Allen`
 
-	csvConverter, clean := createCSVConverterFromFile(t, records, ',')
-	defer clean()
+	csvConverter := converter.NewCSVConverter(strings.NewReader(csvString))
 
 	got, err := csvConverter.GetNumRecords()
 	want := 2
@@ -106,14 +100,11 @@ func TestConvert(t *testing.T) {
 
 	t.Run("convert to JSON", func(t *testing.T) {
 
-		records := [][]string{
-			{"ID", "First Name", "Last Name"},
-			{"1", "James", "Bond"},
-			{"2", "Akinkunle", "Allen"},
-		}
+		const csvString = `ID,First Name,Last Name
+		1,James,Bond
+		2,Akinkunle,Allen`
 
-		csvConverter, clean := createCSVConverterFromFile(t, records, ',')
-		defer clean()
+		csvConverter := converter.NewCSVConverter(strings.NewReader(csvString))
 
 		// Create a temporary JSON file
 		tmpJSONFile, err := os.CreateTemp("", "test-*.json")
@@ -148,39 +139,4 @@ func assertCorrectHeaders(t testing.TB, got, want []string) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("incorrect headers, got %v but want %v", got, want)
 	}
-}
-
-func createTempCSVFile(t testing.TB, records [][]string, delimiter rune) *os.File {
-
-	t.Helper()
-
-	tmpCSVFile, err := os.CreateTemp("", "test-*.csv")
-
-	if err != nil {
-		t.Errorf("could not create temp CSV file %v", err)
-	}
-
-	writer := csv.NewWriter(tmpCSVFile)
-	writer.Comma = delimiter
-	writer.WriteAll(records)
-
-	tmpCSVFile.Seek(0, 0)
-
-	return tmpCSVFile
-}
-
-func createCSVConverterFromFile(t testing.TB, records [][]string, delimiter rune) (*converter.CSVConverter, func()) {
-
-	t.Helper()
-
-	tmpFile := createTempCSVFile(t, records, delimiter)
-
-	cleanUp := func() {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-	}
-
-	csvConverter := converter.NewCSVConverter(tmpFile)
-
-	return csvConverter, cleanUp
 }
