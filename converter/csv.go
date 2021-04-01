@@ -11,7 +11,7 @@ import (
 )
 
 // CSVConverter parses a CSV-parsable io.Reader
-// It only parses files that adheres to the RFC 4180
+// It only parses files that adheres to the RFC 4180 standard
 type CSVConverter struct {
 	headers     []string    // CSV file headers
 	numRecords  int         // Number of records in CSV file
@@ -58,41 +58,11 @@ func (c *CSVConverter) GetHeaders() ([]string, error) {
 		c.reader.FieldsPerRecord = len(headers)
 	}
 
+	headers = cleanRecord(headers)
 	c.headersRead = true
 	c.headers = headers
 
 	return headers, nil
-}
-
-// GetNumRecords returns the number of records in the CSV file
-func (c *CSVConverter) GetNumRecords() (int, error) {
-
-	if c.numRecords != -1 {
-		return c.numRecords, nil
-	}
-
-	// Skip header
-	_, err := c.GetHeaders()
-
-	if err != nil {
-		return 0, fmt.Errorf("could not get number of records in CSV file, %w", err)
-	}
-
-	numRecords := 0
-
-	for {
-		_, err := c.reader.Read()
-
-		switch err {
-		case nil:
-			numRecords++
-		case io.EOF:
-			c.numRecords = numRecords
-			return c.numRecords, nil
-		default:
-			return 0, fmt.Errorf("could not get number of records in CSV file, %w", err)
-		}
-	}
 }
 
 // Convert converts the CSV file into the specified formats and
@@ -140,9 +110,7 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 			return 0, err
 		}
 
-		if record != nil {
-			record = cleanRecord(record)
-		}
+		record = cleanRecord(record)
 	}
 
 	dictRecord := map[string]string{}
@@ -169,9 +137,7 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 
 	if err == nil {
 		writer.Write([]byte{',', '\n'})
-		if record != nil {
-			record = cleanRecord(record)
-		}
+		record = cleanRecord(record)
 		numRecordsConverted, err = c.buildJSON(headers, record, numRecordsConverted, writer)
 	}
 	if err == io.EOF {
@@ -181,6 +147,7 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 	return numRecordsConverted, err
 }
 
+// cleanRecord strips extraneous spaces and quotes from records
 func cleanRecord(record []string) []string {
 	clean_record := make([]string, len(record))
 	for indx, rec := range record {
