@@ -3,9 +3,7 @@ package converter
 import "io"
 
 // Conversion formats supported
-const (
-	FormatJSON = "json"
-)
+var SupportedFormats = []string{"csv", "json"}
 
 // Converter interface is implemented by all supported file converters
 // in the 'converter' package
