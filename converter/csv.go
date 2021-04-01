@@ -58,6 +58,7 @@ func (c *CSVConverter) GetHeaders() ([]string, error) {
 		c.reader.FieldsPerRecord = len(headers)
 	}
 
+	headers = cleanRecord(headers)
 	c.headersRead = true
 	c.headers = headers
 
@@ -140,9 +141,7 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 			return 0, err
 		}
 
-		if record != nil {
-			record = cleanRecord(record)
-		}
+		record = cleanRecord(record)
 	}
 
 	dictRecord := map[string]string{}
@@ -169,9 +168,7 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 
 	if err == nil {
 		writer.Write([]byte{',', '\n'})
-		if record != nil {
-			record = cleanRecord(record)
-		}
+		record = cleanRecord(record)
 		numRecordsConverted, err = c.buildJSON(headers, record, numRecordsConverted, writer)
 	}
 	if err == io.EOF {
