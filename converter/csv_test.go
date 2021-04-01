@@ -1,7 +1,6 @@
 package converter_test
 
 import (
-	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -40,7 +39,7 @@ func TestGetHeaders(t *testing.T) {
 		}
 	})
 
-	t.Run("empty CSV file returns error", func(t *testing.T) {
+	t.Run("getting headers from empty CSV file returns error", func(t *testing.T) {
 
 		const csvString = ``
 		csvConverter := converter.NewCSVConverter(strings.NewReader(csvString))
@@ -49,40 +48,6 @@ func TestGetHeaders(t *testing.T) {
 
 		assertError(t, err, "")
 	})
-}
-
-func TestNumRecords(t *testing.T) {
-
-	tests := []struct {
-		csvString string
-		delimiter string
-	}{
-		{"ID,First_Name,Last_Name\n1,James,Bond\n", "comma"},
-		{"ID\tFirst_Name\tLast_Name\n1\tJames\tBond\n", "tab"},
-		{"ID:First_Name:Last_Name\n1:James:Bond\n", "colon"},
-		{"ID;First_Name;Last_Name\n1;James;Bond\n", "semicolon"},
-		{"ID|First_Name|Last_Name\n1|James|Bond\n", "pipe"},
-	}
-
-	want := 1
-
-	for _, test := range tests {
-		t.Run(test.delimiter, func(t *testing.T) {
-
-			csvConverter := converter.NewCSVConverter(strings.NewReader(test.csvString))
-
-			got, err := csvConverter.GetNumRecords()
-
-			if err != io.EOF && err != nil {
-				assertNoError(t, err, "error getting number of records")
-			}
-
-			if got != want {
-				t.Errorf("incorrect number of records, got %v but want %v", got, want)
-			}
-		})
-	}
-
 }
 
 func TestConvert(t *testing.T) {
