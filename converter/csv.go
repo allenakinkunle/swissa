@@ -3,15 +3,16 @@ package converter
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 )
 
 // CSVConverter parses a CSV-parsable io.Reader
 // It only parses files that adheres to the RFC 4180
 type CSVConverter struct {
-	delimiter   rune
 	headers     []string    // CSV file headers
 	numRecords  int         // Number of records in CSV file
 	headersRead bool        // Flag if header has been read
@@ -23,9 +24,9 @@ func NewCSVConverter(file io.Reader) *CSVConverter {
 
 	reader := csv.NewReader(file)
 	reader.Comment = '#'
+	reader.LazyQuotes = true
 
 	return &CSVConverter{
-		delimiter:  ',',
 		reader:     reader,
 		numRecords: -1,
 	}
@@ -40,6 +41,10 @@ func (c *CSVConverter) GetHeaders() ([]string, error) {
 
 	headers, err := c.reader.Read()
 
+	if headers == nil {
+		return nil, errors.New("cannot read from an empty file")
+	}
+
 	if err != io.EOF && err != nil {
 		return nil, fmt.Errorf("error getting headers, %w", err)
 	}
@@ -47,10 +52,10 @@ func (c *CSVConverter) GetHeaders() ([]string, error) {
 	// Infer the file delimiter, since it is not comma
 	if len(headers) == 1 {
 		delimiter := getDelimiter(headers[0])
-		c.delimiter = delimiter
-		c.reader.Comma = delimiter
-
 		headers = strings.Split(headers[0], string(delimiter))
+
+		c.reader.Comma = delimiter
+		c.reader.FieldsPerRecord = len(headers)
 	}
 
 	c.headersRead = true
@@ -68,6 +73,7 @@ func (c *CSVConverter) GetNumRecords() (int, error) {
 
 	// Skip header
 	_, err := c.GetHeaders()
+
 	if err != nil {
 		return 0, fmt.Errorf("could not get number of records in CSV file, %w", err)
 	}
@@ -94,10 +100,10 @@ func (c *CSVConverter) GetNumRecords() (int, error) {
 func (c *CSVConverter) Convert(toFormat string, writer io.Writer) (int, error) {
 
 	switch toFormat {
-	case FormatJSON:
+	case "json":
 		return c.convertToJSON(writer)
 	default:
-		return 0, nil
+		return 0, errors.New("unsupported conversion file type")
 	}
 }
 
@@ -106,7 +112,7 @@ func (c *CSVConverter) convertToJSON(writer io.Writer) (int, error) {
 	headers, err := c.GetHeaders()
 
 	if err != nil {
-		return 0, fmt.Errorf("could not convert CSV to JSON %w", err)
+		return 0, err
 	}
 
 	writer.Write([]byte{'['})
@@ -132,6 +138,10 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 		record, err = c.reader.Read()
 		if err != io.EOF && err != nil {
 			return 0, err
+		}
+
+		if record != nil {
+			record = cleanRecord(record)
 		}
 	}
 
@@ -159,6 +169,9 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 
 	if err == nil {
 		writer.Write([]byte{',', '\n'})
+		if record != nil {
+			record = cleanRecord(record)
+		}
 		numRecordsConverted, err = c.buildJSON(headers, record, numRecordsConverted, writer)
 	}
 	if err == io.EOF {
@@ -166,6 +179,17 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 	}
 
 	return numRecordsConverted, err
+}
+
+func cleanRecord(record []string) []string {
+	clean_record := make([]string, len(record))
+	for indx, rec := range record {
+		clean := strings.TrimFunc(rec, func(r rune) bool {
+			return r == '"' || r == '\'' || unicode.IsSpace(r)
+		})
+		clean_record[indx] = clean
+	}
+	return clean_record
 }
 
 // getDelimiter tries to detect the delimiter of the file (rather crudely)
