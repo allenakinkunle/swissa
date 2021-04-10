@@ -17,6 +17,7 @@ type CSVConverter struct {
 	numRecords  int         // Number of records in CSV file
 	headersRead bool        // Flag if header has been read
 	reader      *csv.Reader // CSV Reader
+	writer      io.Writer   // io.Writer to write to
 }
 
 // NewCSVConverter constructs a new instance of CSVConverter and returns a pointer to it
@@ -65,15 +66,12 @@ func (c *CSVConverter) getHeaders() ([]string, error) {
 // Convert converts the CSV file into the specified formats and
 // writes it to the provided io.Writer
 func (c *CSVConverter) Convert(toFormat string, writer io.Writer) (int, error) {
-	headers, err := c.getHeaders()
 
-	if err != nil {
-		return 0, err
-	}
+	c.writer = writer
 
 	switch toFormat {
 	case FormatJSON:
-		return c.convertToJSON(headers, writer)
+		return c.convertToJSON()
 	default:
 		return 0, errors.New("unsupported conversion file type")
 	}
@@ -81,39 +79,56 @@ func (c *CSVConverter) Convert(toFormat string, writer io.Writer) (int, error) {
 
 // convertToJSON converts the CSV file into JSON and writes
 // it to the provided io.Writer
-func (c *CSVConverter) convertToJSON(headers []string, writer io.Writer) (int, error) {
-	writer.Write([]byte{'['})
+func (c *CSVConverter) convertToJSON() (int, error) {
 
-	numRecordsConverted, err := c.buildJSON(headers, nil, 0, writer)
+	headers, err := c.getHeaders()
 
 	if err != nil {
-		return numRecordsConverted, err
+		return 0, err
 	}
 
-	writer.Write([]byte{']'})
+	c.writer.Write([]byte{'['})
 
-	return numRecordsConverted, err
-}
+	var numRecordsConverted int
+	var record []string
 
-// buildJSON recursively builds the JSON array from CSV records and write them to provided writer
-func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted int, writer io.Writer) (int, error) {
-	var err error
-
-	if numRecordsConverted == 0 {
+	for {
 		record, err = c.reader.Read()
 
+		// Check header and record match
+
+		if err == nil && numRecordsConverted != 0 {
+			_, err = c.writer.Write([]byte{',', '\n'})
+		}
+
 		if err == io.EOF {
-			return 0, errors.New("csv file has no records, just headers")
+			if numRecordsConverted == 0 {
+				return 0, errors.New("csv file has no records, just headers")
+			} else {
+				break
+			}
 		}
 
 		if err != nil {
 			return 0, err
 		}
 
-		record = cleanRecord(record)
+		err = c.writeJSON(headers, cleanRecord(record))
+
+		if err != nil {
+			return 0, err
+		}
+
+		numRecordsConverted++
 	}
 
-	dictRecord := map[string]string{}
+	c.writer.Write([]byte{']', '\n'})
+
+	return numRecordsConverted, nil
+}
+
+func (c *CSVConverter) writeJSON(headers, record []string) error {
+	dictRecord := make(map[string]string)
 
 	for i, header := range headers {
 		dictRecord[header] = record[i]
@@ -122,31 +137,12 @@ func (c *CSVConverter) buildJSON(headers, record []string, numRecordsConverted i
 	jsonRecord, err := json.MarshalIndent(&dictRecord, "", "  ")
 
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	_, err = writer.Write(jsonRecord)
+	_, err = c.writer.Write(jsonRecord)
 
-	if err != nil {
-		return 0, err
-	}
-
-	numRecordsConverted++
-
-	// Convert records to JSON if there are more to process
-	record, err = c.reader.Read()
-
-	if err == nil {
-		writer.Write([]byte{',', '\n'})
-		record = cleanRecord(record)
-		numRecordsConverted, err = c.buildJSON(headers, record, numRecordsConverted, writer)
-	}
-
-	if err == io.EOF {
-		return numRecordsConverted, nil
-	}
-
-	return numRecordsConverted, err
+	return err
 }
 
 // cleanRecord strips extraneous spaces and quotes from records
